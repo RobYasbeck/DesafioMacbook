@@ -40,7 +40,6 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
 .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px}
 .pc{background:#1e1e2e;border:1px solid #2a2a3e;border-radius:10px;padding:12px;text-align:center;transition:border-color .3s}
 .pc.ok{border-color:#00ff88}
-.pc.risk{border-color:#ff5555}
 .av{width:44px;height:44px;border-radius:50%;background:#16161f;border:2px solid #2a2a3e;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#40d8ff;overflow:hidden}
 .av.vi{color:#ff6ec7}
 .av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
@@ -48,12 +47,15 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
 .pv{font-size:16px;font-weight:800;color:#00ff88;margin-bottom:4px}
 .mb{height:4px;background:#111118;border-radius:999px;overflow:hidden;margin-bottom:4px}
 .mbf{height:100%;border-radius:999px;background:#00ff88;transition:width .8s ease}
-.bdg{display:inline-block;font-size:8px;padding:2px 7px;border-radius:999px;font-weight:700;text-transform:uppercase}
-.bdg.ok{background:#00ff8822;color:#00ff88;border:1px solid #00ff8840}
-.bdg.rk{background:#ff555522;color:#ff8888;border:1px solid #ff555540;font-size:7.5px;text-transform:none;font-weight:600;white-space:nowrap}
-.bdg.nd{background:#40d8ff18;color:#40d8ff;border:1px solid #40d8ff30}
-.bdg.vok{background:#ff6ec722;color:#ff6ec7;border:1px solid #ff6ec740}
-.bdg.vnd{background:#ff6ec710;color:#ffaadd;border:1px solid #ff6ec725}
+.bdg{display:inline-block;font-size:8px;padding:2px 7px;border-radius:999px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.bdg.ok   {background:#00ff8822;color:#00ff88;border:1px solid #00ff8840}
+.bdg.p1   {background:#ffd70022;color:#ffd700;border:1px solid #ffd70050;font-size:8px}
+.bdg.p2   {background:#c0c0c022;color:#d0d0d0;border:1px solid #c0c0c050;font-size:8px}
+.bdg.p3   {background:#cd7f3222;color:#cd7f32;border:1px solid #cd7f3250;font-size:8px}
+.bdg.ch   {background:#ffffff12;color:#ffffff99;border:1px solid #ffffff25;font-size:8px}
+.bdg.nd   {background:#40d8ff18;color:#40d8ff;border:1px solid #40d8ff30}
+.bdg.vok  {background:#ff6ec722;color:#ff6ec7;border:1px solid #ff6ec740}
+.bdg.vnd  {background:#ff6ec710;color:#ffaadd;border:1px solid #ff6ec725}
 .rblock{background:#16161f;border:1px solid #2a2a3e;border-radius:14px;padding:18px}
 .rr{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #2a2a3e}
 .rr:last-child{border-bottom:none}
@@ -213,19 +215,21 @@ function setSyncDot(state){
   d.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':'');
 }
 
-function falta(v){return Math.max(0,META_IND-v);}
-function statusB(v){
-  var p=v/META_IND;
-  if(p>=1)return{c:'ok',l:'Atingiu!'};
-  if(p>=.5)return{c:'nd',l:'No caminho'};
-  return{c:'rk',l:'Falta '+fmt(falta(v))+' para atingir!'};
+function rankMap(people,vals){
+  var sorted=people.slice().sort(function(a,b){return (vals[b]||0)-(vals[a]||0);});
+  var map={};
+  sorted.forEach(function(n,i){map[n]=i;});
+  return map;
 }
-function statusV(v){
-  var p=v/META_IND;
-  if(p>=1)return{c:'vok',l:'Atingiu!'};
-  if(p>=.5)return{c:'vnd',l:'No caminho'};
-  return{c:'rk',l:'Falta '+fmt(falta(v))+' para atingir!'};
+
+function badgeByRank(pos,atingiu,isVend){
+  if(atingiu) return {c:isVend?'vok':'ok', l:'Atingiu!'};
+  if(pos===0)  return {c:'p1', l:'Primeiro lugar'};
+  if(pos===1)  return {c:'p2', l:'Segundo lugar'};
+  if(pos===2)  return {c:'p3', l:'Terceiro lugar'};
+  return {c:'ch', l:'Challenger'};
 }
+
 function mkAv(name,isVend){
   var foto=data.fotos[name];
   var cl='av'+(isVend?' vi':'');
@@ -233,12 +237,20 @@ function mkAv(name,isVend){
   if(foto)return '<div class="'+cl+'"><img src="'+foto+'" alt="'+ini+'" onerror="this.parentNode.textContent=\''+ini+'\'"></div>';
   return '<div class="'+cl+'">'+ini+'</div>';
 }
-function renderCard(name,val,isVend){
-  var pct=Math.min(100,Math.round(val/META_IND*100));
-  var st=isVend?statusV(val):statusB(val);
-  var extra=val>=META_IND?' ok':val>0&&val<META_IND*.3?' risk':'';
-  return '<div class="pc'+extra+'">'+mkAv(name,isVend)+'<div class="pn">'+name+'</div><div class="pv">'+fmt(val)+'</div><div class="mb"><div class="mbf" style="width:'+pct+'%"></div></div><div class="bdg '+st.c+'">'+st.l+'</div></div>';
+
+function renderCards(people,vals,isVend){
+  var ranks=rankMap(people,vals);
+  return people.map(function(name){
+    var val=vals[name]||0;
+    var pct=Math.min(100,Math.round(val/META_IND*100));
+    var pos=ranks[name];
+    var atingiu=val>=META_IND;
+    var st=badgeByRank(pos,atingiu,isVend);
+    var cardCls='pc'+(atingiu?' ok':'');
+    return '<div class="'+cardCls+'">'+mkAv(name,isVend)+'<div class="pn">'+name+'</div><div class="pv">'+fmt(val)+'</div><div class="mb"><div class="mbf" style="width:'+pct+'%"></div></div><div class="bdg '+st.c+'">'+st.l+'</div></div>';
+  }).join('');
 }
+
 function renderRank(people,vals,isVend){
   var sorted=people.slice().sort(function(a,b){return (vals[b]||0)-(vals[a]||0);});
   var med=['g','s','b'];
@@ -252,6 +264,7 @@ function renderRank(people,vals,isVend){
     return '<div class="rr"><div class="rpos '+(med[i]||'')+'">'+( i+1)+'</div><div class="'+avcl+'">'+avc+'</div><div class="ri"><div class="rn">'+name+'</div><div class="rb"><div class="rbf" style="width:'+pct+'%"></div></div></div><div class="rv2">'+fmt(val)+'</div></div>';
   }).join('');
 }
+
 function renderAll(){
   var total=(data.marco||0)+(data.abril||0)+(data.maio||0);
   var pct=Math.min(100,Math.round(total/META_G*100));
@@ -267,11 +280,12 @@ function renderAll(){
   var mEl=document.getElementById('mmai');
   mEl.textContent=fmt(data.maio);
   mEl.className='mes-v'+(data.maio>0?'':' z');
-  document.getElementById('gbdr').innerHTML=BDRS.map(function(n){return renderCard(n,data.bdr[n]||0,false);}).join('');
-  document.getElementById('gvend').innerHTML=VENDS.map(function(n){return renderCard(n,data.vend[n]||0,true);}).join('');
+  document.getElementById('gbdr').innerHTML=renderCards(BDRS,data.bdr,false);
+  document.getElementById('gvend').innerHTML=renderCards(VENDS,data.vend,true);
   document.getElementById('rbdr').innerHTML=renderRank(BDRS,data.bdr,false);
   document.getElementById('rvend').innerHTML=renderRank(VENDS,data.vend,true);
 }
+
 function applyRow(row){
   if(!row)return;
   data.marco=row.marco||0;
@@ -282,6 +296,7 @@ function applyRow(row){
   data.fotos=row.fotos||{};
   renderAll();
 }
+
 async function loadFromSupabase(){
   setSyncDot('');
   var res=await sb.from('campanha').select('*').eq('id','dados').single();
@@ -289,6 +304,7 @@ async function loadFromSupabase(){
   setSyncDot('ok');
   applyRow(res.data);
 }
+
 function buildInputs(){
   document.getElementById('im').value=data.marco||0;
   document.getElementById('ia').value=data.abril||0;
@@ -297,11 +313,13 @@ function buildInputs(){
   document.getElementById('ivend').innerHTML=VENDS.map(function(n){return '<div class="ef"><label class="el">'+n+'</label><input class="ei vend" id="vd-'+slug(n)+'" type="number" value="'+(data.vend[n]||0)+'"></div>';}).join('');
   document.getElementById('ifotos').innerHTML=BDRS.concat(VENDS).map(function(n){return '<div class="ef"><label class="el">'+n+'</label><input class="ei" id="fo-'+slug(n)+'" type="text" placeholder="URL da foto" value="'+(data.fotos[n]||'')+'"></div>';}).join('');
 }
+
 function toggleEdit(){
   var f=document.getElementById('eform');
   f.classList.toggle('open');
   if(f.classList.contains('open'))buildInputs();
 }
+
 async function salvar(){
   var btn=document.getElementById('btn-salvar');
   btn.disabled=true;btn.textContent='Salvando...';
