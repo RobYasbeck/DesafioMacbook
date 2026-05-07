@@ -101,6 +101,20 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .hint-pulse{animation:pulse 2s ease-in-out 3}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #00ff8800}50%{box-shadow:0 0 0 7px #00ff8845}}
+
+/* Modal de senha */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:#16161f;border:1px solid #2a2a3e;border-radius:16px;padding:32px 28px;width:100%;max-width:320px;text-align:center}
+.modal-title{font-size:15px;font-weight:700;color:#f0f0fa;margin-bottom:6px}
+.modal-sub{font-size:12px;color:#9090b0;margin-bottom:20px}
+.modal-input{background:#1e1e2e;border:1px solid #2a2a3e;color:#f0f0fa;padding:10px 14px;border-radius:8px;font-size:20px;font-family:inherit;width:100%;text-align:center;letter-spacing:.3em;margin-bottom:8px;transition:border-color .2s}
+.modal-input:focus{outline:none;border-color:#00ff88}
+.modal-erro{font-size:11px;color:#ff7070;min-height:16px;margin-bottom:12px}
+.modal-btn{background:#00ff88;color:#000;border:none;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%}
+.modal-btn:hover{opacity:.85}
+.modal-cancel{font-size:11px;color:#6b6b8a;cursor:pointer;margin-top:12px;display:inline-block}
+.modal-cancel:hover{color:#9090b0}
 </style>
 </head>
 <body>
@@ -108,7 +122,7 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
 
 <div class="hdr">
   <div class="badge-top">
-    <div class="badge-dot hint-pulse" onclick="toggleEdit()" title=""></div>
+    <div class="badge-dot hint-pulse" onclick="pedirSenha()" title=""></div>
     Busca Orgânica · SEO
     <span class="sync-dot" id="sync-dot"></span>
   </div>
@@ -187,7 +201,19 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
   <button class="bsalvar" id="btn-salvar" onclick="salvar()">Salvar e atualizar para todos</button>
 </div>
 
-<div class="footer-dash"><span onclick="toggleEdit()">· · ·</span></div>
+<div class="footer-dash"><span onclick="pedirSenha()">· · ·</span></div>
+</div>
+
+<!-- Modal senha -->
+<div class="modal-overlay" id="modal-senha">
+  <div class="modal-box">
+    <div class="modal-title">Área restrita</div>
+    <div class="modal-sub">Digite a senha para acessar o painel de edição</div>
+    <input class="modal-input" id="senha-input" type="password" maxlength="10" placeholder="••••" onkeydown="if(event.key==='Enter')confirmarSenha()">
+    <div class="modal-erro" id="senha-erro"></div>
+    <button class="modal-btn" onclick="confirmarSenha()">Entrar</button>
+    <div class="modal-cancel" onclick="fecharModal()">Cancelar</div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -198,9 +224,11 @@ var SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 var BDRS=['Rebeca','Leandro S.','Larissa','Julya','Vitória','Alice'];
-var VENDS=['Lucas','Leandro V.','Carlos Se.','Carlos Sa.','Nataly','Leonardo'];
+var VENDS=['Lucas','Leandro V.','Carlos Se.','Carlos Sa.','Nataly'];
 var META_IND=20000,META_G=90000;
 var data={marco:0,abril:0,maio:0,bdr:{},vend:{},fotos:{}};
+var SENHA='1651';
+var autenticado=false;
 
 function slug(n){return n.replace(/[^a-z0-9]/gi,'_');}
 function fmt(n){if(!n||n===0)return 'R$ 0';return 'R$ '+Math.round(n).toLocaleString('pt-BR');}
@@ -216,6 +244,36 @@ function setSyncDot(state){
   var d=document.getElementById('sync-dot');
   d.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':'');
 }
+
+function pedirSenha(){
+  if(autenticado){toggleEdit();return;}
+  var m=document.getElementById('modal-senha');
+  m.classList.add('open');
+  document.getElementById('senha-input').value='';
+  document.getElementById('senha-erro').textContent='';
+  setTimeout(function(){document.getElementById('senha-input').focus();},100);
+}
+
+function confirmarSenha(){
+  var v=document.getElementById('senha-input').value;
+  if(v===SENHA){
+    autenticado=true;
+    fecharModal();
+    toggleEdit();
+  } else {
+    document.getElementById('senha-erro').textContent='Senha incorreta. Tente novamente.';
+    document.getElementById('senha-input').value='';
+    document.getElementById('senha-input').focus();
+  }
+}
+
+function fecharModal(){
+  document.getElementById('modal-senha').classList.remove('open');
+}
+
+document.getElementById('modal-senha').addEventListener('click',function(e){
+  if(e.target===this)fecharModal();
+});
 
 function sortedByVal(people,vals){
   return people.slice().sort(function(a,b){return (vals[b]||0)-(vals[a]||0);});
@@ -238,7 +296,7 @@ function renderCards(people,vals,isVend){
     var atingiu=val>=META_IND;
     var cardCls,bdgCls,bdgLbl,crown='';
     if(atingiu){
-      cardCls='pc ok'; bdgCls='ok'; bdgLbl='Atingiu!';
+      cardCls='pc ok'; bdgCls=isVend?'vok':'ok'; bdgLbl='Atingiu!';
     } else if(i===0){
       cardCls='pc p1'; bdgCls='p1'; bdgLbl='Primeiro lugar'; crown=crowns[0];
     } else if(i===1){
