@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Desafio Macbook · Busca Orgânica</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;padding:20px}
@@ -86,6 +87,14 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
 .ei.vend{border-left:2px solid #ff6ec7}
 .bsalvar{background:#00ff88;color:#000;border:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:16px;transition:opacity .2s}
 .bsalvar:hover{opacity:.85}
+.bsalvar:disabled{opacity:.5;cursor:not-allowed}
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(100px);background:#00ff88;color:#000;padding:12px 28px;border-radius:999px;font-size:13px;font-weight:700;transition:transform .4s cubic-bezier(.4,0,.2,1);z-index:999;pointer-events:none;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.erro{background:#ff5555;color:#fff}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:#9090b0;display:inline-block;margin-left:4px;transition:background .4s}
+.sync-dot.ok{background:#00ff88;animation:blink 2.5s ease-in-out infinite}
+.sync-dot.err{background:#ff5555}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .hint-pulse{animation:pulse 2s ease-in-out 3}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #00ff8800}50%{box-shadow:0 0 0 7px #00ff8845}}
 </style>
@@ -95,8 +104,9 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
 
 <div class="hdr">
   <div class="badge-top">
-    <div class="badge-dot hint-pulse" id="secret-btn" onclick="toggleEdit()" title=""></div>
+    <div class="badge-dot hint-pulse" onclick="toggleEdit()" title=""></div>
     Busca Orgânica · SEO
+    <span class="sync-dot" id="sync-dot"></span>
   </div>
   <div class="ttl">Desafio <em>Macbook</em></div>
   <div class="sub">Quem chegar lá, ganha. Simples assim.</div>
@@ -106,22 +116,22 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
   <div class="row-sb">
     <div>
       <div class="lbl">Meta geral — desafio coletivo</div>
-      <div class="big-val" id="vt">R$ 29.200</div>
+      <div class="big-val" id="vt">carregando...</div>
       <div class="big-tgt">de R$ 90.000 · Macbook para toda a equipe</div>
     </div>
     <div style="text-align:right">
-      <div class="big-pct" id="pt">32<sup>%</sup></div>
-      <div style="font-size:13px;color:#9090b0;margin-top:4px" id="ft">Faltam R$ 60.800</div>
+      <div class="big-pct" id="pt">—<sup>%</sup></div>
+      <div style="font-size:13px;color:#9090b0;margin-top:4px" id="ft"></div>
     </div>
   </div>
-  <div class="trk"><div class="trk-fill" id="tg" style="width:32.4%"></div></div>
+  <div class="trk"><div class="trk-fill" id="tg" style="width:0%"></div></div>
   <div class="trk-marks">
     <span>R$ 0</span><span>R$ 22.5k</span><span>R$ 45k</span><span>R$ 67.5k</span><span>R$ 90k</span>
   </div>
   <div class="mes-row">
-    <div class="mes"><div class="mes-n">Bônus Março</div><div class="mes-v" id="mm">R$ 6.000</div></div>
-    <div class="mes"><div class="mes-n">Abril</div><div class="mes-v" id="ma">R$ 23.200</div></div>
-    <div class="mes"><div class="mes-n">Maio</div><div class="mes-v z" id="mmai">R$ 0</div></div>
+    <div class="mes"><div class="mes-n">Bônus Março</div><div class="mes-v z" id="mm">—</div></div>
+    <div class="mes"><div class="mes-n">Abril</div><div class="mes-v z" id="ma">—</div></div>
+    <div class="mes"><div class="mes-n">Maio</div><div class="mes-v z" id="mmai">—</div></div>
   </div>
 </div>
 
@@ -153,8 +163,8 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
   <div class="esec">
     <div class="esec-t">Meta geral (R$)</div>
     <div class="egrid">
-      <div class="ef"><label class="el">Bônus Março</label><input class="ei" id="im" type="number" value="6000"></div>
-      <div class="ef"><label class="el">Abril</label><input class="ei" id="ia" type="number" value="23200"></div>
+      <div class="ef"><label class="el">Bônus Março</label><input class="ei" id="im" type="number" value="0"></div>
+      <div class="ef"><label class="el">Abril</label><input class="ei" id="ia" type="number" value="0"></div>
       <div class="ef"><label class="el">Maio</label><input class="ei" id="imai" type="number" value="0"></div>
     </div>
   </div>
@@ -170,34 +180,38 @@ body{background:#0a0a0f;min-height:100vh;display:flex;justify-content:center;pad
     <div class="esec-t muted">Fotos — URL por pessoa</div>
     <div class="egrid" id="ifotos"></div>
   </div>
-  <button class="bsalvar" onclick="salvar()">Salvar e atualizar</button>
+  <button class="bsalvar" id="btn-salvar" onclick="salvar()">Salvar e atualizar para todos</button>
 </div>
 
 <div class="footer-dash"><span onclick="toggleEdit()">· · ·</span></div>
-
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
+var SUPABASE_URL='https://vgtmjwmvsuabjdcbmvwc.supabase.co';
+var SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZndG1qd212c3VhYmpkY2JtdndjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNTY3MTgsImV4cCI6MjA5MzczMjcxOH0.yQdNZgwE1nlYN4eyrJRIaS2MUBnrWQSg_kjOw7dhVUE';
+var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
 var BDRS=['Rebeca','Leandro S.','Larissa','Julya','Vitória','Alice'];
 var VENDS=['Lucas','Leandro V.','Carlos Se.','Carlos Sa.','Nataly','Leonardo'];
 var META_IND=20000,META_G=90000;
+var data={marco:0,abril:0,maio:0,bdr:{},vend:{},fotos:{}};
 
 function slug(n){return n.replace(/[^a-z0-9]/gi,'_');}
 function fmt(n){if(!n||n===0)return 'R$ 0';return 'R$ '+Math.round(n).toLocaleString('pt-BR');}
 function initials(n){return n.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
 
-function defData(){
-  var d={marco:6000,abril:23200,maio:0,fotos:{},bdr:{},vend:{}};
-  BDRS.forEach(function(n){d.bdr[n]=0;});
-  VENDS.forEach(function(n){d.vend[n]=0;});
-  return d;
+function showToast(msg,erro){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast'+(erro?' erro':'')+' show';
+  setTimeout(function(){t.className='toast'+(erro?' erro':'');},3000);
 }
-function loadData(){
-  try{var s=localStorage.getItem('mb_dash_v1');if(s)return Object.assign(defData(),JSON.parse(s));}catch(e){}
-  return defData();
+function setSyncDot(state){
+  var d=document.getElementById('sync-dot');
+  d.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':'');
 }
-function saveData(d){try{localStorage.setItem('mb_dash_v1',JSON.stringify(d));}catch(e){}}
-var data=loadData();
 
 function falta(v){return Math.max(0,META_IND-v);}
 function statusB(v){
@@ -247,7 +261,9 @@ function renderAll(){
   document.getElementById('ft').textContent=faltaG>0?'Faltam '+fmt(faltaG):'Meta atingida!';
   document.getElementById('tg').style.width=(total/META_G*100)+'%';
   document.getElementById('mm').textContent=fmt(data.marco);
+  document.getElementById('mm').className='mes-v'+(data.marco>0?'':' z');
   document.getElementById('ma').textContent=fmt(data.abril);
+  document.getElementById('ma').className='mes-v'+(data.abril>0?'':' z');
   var mEl=document.getElementById('mmai');
   mEl.textContent=fmt(data.maio);
   mEl.className='mes-v'+(data.maio>0?'':' z');
@@ -255,6 +271,23 @@ function renderAll(){
   document.getElementById('gvend').innerHTML=VENDS.map(function(n){return renderCard(n,data.vend[n]||0,true);}).join('');
   document.getElementById('rbdr').innerHTML=renderRank(BDRS,data.bdr,false);
   document.getElementById('rvend').innerHTML=renderRank(VENDS,data.vend,true);
+}
+function applyRow(row){
+  if(!row)return;
+  data.marco=row.marco||0;
+  data.abril=row.abril||0;
+  data.maio=row.maio||0;
+  data.bdr=row.bdr||{};
+  data.vend=row.vend||{};
+  data.fotos=row.fotos||{};
+  renderAll();
+}
+async function loadFromSupabase(){
+  setSyncDot('');
+  var res=await sb.from('campanha').select('*').eq('id','dados').single();
+  if(res.error){setSyncDot('err');showToast('Erro ao conectar ao banco.',true);return;}
+  setSyncDot('ok');
+  applyRow(res.data);
 }
 function buildInputs(){
   document.getElementById('im').value=data.marco||0;
@@ -269,20 +302,35 @@ function toggleEdit(){
   f.classList.toggle('open');
   if(f.classList.contains('open'))buildInputs();
 }
-function salvar(){
-  data.marco=parseFloat(document.getElementById('im').value)||0;
-  data.abril=parseFloat(document.getElementById('ia').value)||0;
-  data.maio=parseFloat(document.getElementById('imai').value)||0;
-  BDRS.forEach(function(n){var el=document.getElementById('bd-'+slug(n));if(el)data.bdr[n]=parseFloat(el.value)||0;});
-  VENDS.forEach(function(n){var el=document.getElementById('vd-'+slug(n));if(el)data.vend[n]=parseFloat(el.value)||0;});
-  BDRS.concat(VENDS).forEach(function(n){var el=document.getElementById('fo-'+slug(n));if(el&&el.value.trim())data.fotos[n]=el.value.trim();else delete data.fotos[n];});
-  saveData(data);
+async function salvar(){
+  var btn=document.getElementById('btn-salvar');
+  btn.disabled=true;btn.textContent='Salvando...';
+  var newBdr={},newVend={},newFotos={};
+  BDRS.forEach(function(n){var el=document.getElementById('bd-'+slug(n));if(el)newBdr[n]=parseFloat(el.value)||0;});
+  VENDS.forEach(function(n){var el=document.getElementById('vd-'+slug(n));if(el)newVend[n]=parseFloat(el.value)||0;});
+  BDRS.concat(VENDS).forEach(function(n){var el=document.getElementById('fo-'+slug(n));if(el&&el.value.trim())newFotos[n]=el.value.trim();});
+  var payload={
+    id:'dados',
+    marco:parseFloat(document.getElementById('im').value)||0,
+    abril:parseFloat(document.getElementById('ia').value)||0,
+    maio:parseFloat(document.getElementById('imai').value)||0,
+    bdr:newBdr,vend:newVend,fotos:newFotos
+  };
+  var res=await sb.from('campanha').upsert(payload);
+  btn.disabled=false;btn.textContent='Salvar e atualizar para todos';
+  if(res.error){showToast('Erro ao salvar. Verifique a conexão.',true);return;}
+  data=Object.assign({},payload);
   renderAll();
-  var b=document.querySelector('.bsalvar');
-  b.textContent='Salvo com sucesso!';
-  setTimeout(function(){b.textContent='Salvar e atualizar';},1800);
+  showToast('Salvo! Todos os dispositivos foram atualizados.');
 }
-renderAll();
+
+sb.channel('campanha-realtime')
+  .on('postgres_changes',{event:'*',schema:'public',table:'campanha'},function(payload){
+    if(payload.new)applyRow(payload.new);
+  })
+  .subscribe();
+
+loadFromSupabase();
 </script>
 </body>
 </html>
